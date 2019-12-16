@@ -12,25 +12,24 @@ public class GStreamerOutput {
     public  GStreamerOutput()
     {
         Gst.init();
-        pipeline = (Pipeline) Gst.parseLaunch("appsrc name=src ! queue ! decodebin ! videoconvert ! autovideosink");
+        pipeline = (Pipeline) Gst.parseLaunch("appsrc name=src ! video/x-h264 ! queue  ! decodebin ! videoconvert ! autovideosink");
 
         AppSrc source = (AppSrc) pipeline.getElementByName("src");
         source.set("emit-signals", true);
 
         source.connect((AppSrc.NEED_DATA) (element, size) ->
         {
-            synchronized (sync) {
-                if (bytes == null)
-                    return;
-                byte[] tempBuffer = new byte[bytes.length];
-                Buffer buf = new Buffer(bytes.length);
-                ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-                byteBuffer.get(tempBuffer);
+         /*   synchronized (sync) {
 
-                buf.map(true).put(ByteBuffer.wrap(tempBuffer));
-                System.out.println("gst " + tempBuffer.length);
+                if (bytes == null)
+                    bytes = new byte[size];
+
+                Buffer buf = new Buffer(bytes.length);
+                buf.map(true).put(ByteBuffer.wrap(bytes));
+                System.out.println("gst " + bytes.length);
                 element.pushBuffer(buf);
-            }
+                buf.unmap();
+            }*/
 
         });
 
@@ -40,7 +39,12 @@ public class GStreamerOutput {
             System.out.println("Error source: " + source.getName());
             System.out.println("Error code: " + code);
             System.out.println("Message: " + message);
-            Gst.quit();
+          //  Gst.quit();
+        });
+
+
+        bus.connect((Bus.EOS) (s) -> {
+            System.out.println("Received the EOS on the playbin!!!");
         });
 
         /*bus.connect((Bus.WARNING)(src, code, message) -> {
