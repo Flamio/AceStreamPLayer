@@ -4,32 +4,41 @@ import org.freedesktop.gstreamer.*;
 import org.freedesktop.gstreamer.elements.AppSrc;
 
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 
 public class GStreamerOutput {
     private final Pipeline pipeline;
     private final Object sync = new Object();
+    private boolean isNew = false;
 
     public  GStreamerOutput()
     {
         Gst.init();
-        pipeline = (Pipeline) Gst.parseLaunch("appsrc name=src ! video/x-h264 ! queue  ! decodebin ! videoconvert ! autovideosink");
+        pipeline = (Pipeline) Gst.parseLaunch("appsrc name=src ! video/mpegts ! tsdemux name=demuxer demuxer. ! queue ! h264parse ! avdec_h264 ! vaapisink demuxer. ! queue ! aacparse ! avdec_aac ! autoaudiosink");
 
         AppSrc source = (AppSrc) pipeline.getElementByName("src");
         source.set("emit-signals", true);
 
+        byte[] emptyBytes = new byte[5000];
+
         source.connect((AppSrc.NEED_DATA) (element, size) ->
         {
-         /*   synchronized (sync) {
+            synchronized (sync) {
 
-                if (bytes == null)
-                    bytes = new byte[size];
+                if (this.bytes == null)
+                    this.bytes = emptyBytes;
 
-                Buffer buf = new Buffer(bytes.length);
-                buf.map(true).put(ByteBuffer.wrap(bytes));
-                System.out.println("gst " + bytes.length);
+                if (!isNew)
+                    this.bytes = emptyBytes;
+
+                Buffer buf = new Buffer(this.bytes.length);
+                buf.map(true).put(ByteBuffer.wrap(this.bytes));
+                System.out.println("gst " + this.bytes.length);
                 element.pushBuffer(buf);
+                isNew = false;
                 buf.unmap();
-            }*/
+               // buf.unmap();
+            }
 
         });
 
@@ -64,8 +73,11 @@ public class GStreamerOutput {
     private byte[] bytes;
 
     public void setBytes(byte[] bytes) {
+        if (isNew)
+            return;
         synchronized (sync) {
-            this.bytes = bytes;
+            this.bytes = Arrays.copyOf(bytes, bytes.length);
+            this.isNew = true;
         }
     }
 }
