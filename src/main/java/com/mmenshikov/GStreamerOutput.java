@@ -3,42 +3,48 @@ package com.mmenshikov;
 import org.freedesktop.gstreamer.*;
 import org.freedesktop.gstreamer.elements.AppSrc;
 
+import java.lang.reflect.Array;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 
 public class GStreamerOutput {
     private final Pipeline pipeline;
     private final Object sync = new Object();
-    private boolean isNew = false;
+    private volatile boolean isNew = false;
 
     public  GStreamerOutput()
     {
         Gst.init();
-        pipeline = (Pipeline) Gst.parseLaunch("appsrc name=src ! video/mpegts ! tsdemux name=demuxer demuxer. ! queue ! h264parse ! avdec_h264 ! vaapisink demuxer. ! queue ! aacparse ! avdec_aac ! autoaudiosink");
+        pipeline = (Pipeline) Gst.parseLaunch("appsrc name=src ! video/mpegts ! tsdemux name=demuxer demuxer. " +
+                "! queue ! h264parse ! avdec_h264 ! vaapisink demuxer. " +
+                "! queue ! aacparse ! avdec_aac ! autoaudiosink");
 
         AppSrc source = (AppSrc) pipeline.getElementByName("src");
         source.set("emit-signals", true);
 
-        byte[] emptyBytes = new byte[5000];
+        byte[] emptyBytes = new byte[1];
 
         source.connect((AppSrc.NEED_DATA) (element, size) ->
         {
+            byte[] buffer = null;
             synchronized (sync) {
-
-                if (this.bytes == null)
-                    this.bytes = emptyBytes;
-
                 if (!isNew)
-                    this.bytes = emptyBytes;
-
-                Buffer buf = new Buffer(this.bytes.length);
-                buf.map(true).put(ByteBuffer.wrap(this.bytes));
-                System.out.println("gst " + this.bytes.length);
-                element.pushBuffer(buf);
-                isNew = false;
-                buf.unmap();
-               // buf.unmap();
+                    buffer = emptyBytes;
+                else {
+                    if (this.bytes != null)
+                        buffer = Arrays.copyOf(this.bytes, this.bytes.length);
+                    else
+                        buffer = emptyBytes;
+                    isNew = false;
+                }
             }
+
+                Buffer buf = new Buffer(buffer.length);
+                buf.map(true).put(ByteBuffer.wrap(buffer));
+                System.out.println("gst " + buffer.length);
+                element.pushBuffer(buf);
+
+              //  buf.unmap();
 
         });
 
@@ -73,9 +79,10 @@ public class GStreamerOutput {
     private byte[] bytes;
 
     public void setBytes(byte[] bytes) {
-        if (isNew)
-            return;
         synchronized (sync) {
+            if (isNew)
+                return;
+
             this.bytes = Arrays.copyOf(bytes, bytes.length);
             this.isNew = true;
         }

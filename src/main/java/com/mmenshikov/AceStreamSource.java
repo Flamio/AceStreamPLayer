@@ -33,12 +33,12 @@ public class AceStreamSource {
 
                     if (streamListener != null)
                         streamListener.newChunk(buffer2.array());
+                    System.out.println("ace " + buffer2.capacity());
 
                    // FileUtils.writeByteArrayToFile(new File(i + ".mp4"), buffer2.array());
                     i++;
                 }
                 buffer2.put(Arrays.copyOfRange(buffer.array(), 0,readed));
-                System.out.println("ace " + readed);
                 allReaded+=readed;
             }
             buffer.clear();
